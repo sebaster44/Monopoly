@@ -139,3 +139,10 @@ npm run build          # production build
 
 - Games live in memory: restarting the backend ends them. Finished games are not cleaned up.
 - A player who leaves keeps their seat. Their turn waits until they come back.
+
+
+## What I would do with more time
+- More system tests.
+- Some unit tests.
+- Remove the "New game" section in the loby for guests.
+
