@@ -9,6 +9,17 @@ A simplified multiplayer Monopoly game played in the browser.
 
 Prerequisites: Python 3.12+ and Node.js 20.19+.
 
+**Quick start:** from the repository root, run
+
+```bash
+python start.py
+```
+
+It installs the dependencies on first run, starts both servers, and stops both on Ctrl+C. Then open
+http://localhost:5173. Set `BACKEND_PORT` if port 8000 is taken.
+
+Or start each part manually:
+
 **1. Backend** (from `backend/`):
 
 ```bash
