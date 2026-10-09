@@ -22,28 +22,28 @@ class Session:
         self.socket = socket
         self.lobby = lobby
         self._room: Room | None = None
-        self._player_id: str | None = None
+        self._seat: Seat | None = None
 
     async def join(self, room: Room, name: str) -> Seat:
         self._ensure_unseated()
-        seat = await room.join(name, self.socket)
-        self._room, self._player_id = room, seat.player_id
-        return seat
-
-    async def reconnect(self, room: Room, token: str) -> str:
-        self._ensure_unseated()
-        self._player_id = await room.reconnect(token, self.socket)
+        self._seat = await room.join(name, self.socket)
         self._room = room
-        return self._player_id
+        return self._seat
+
+    async def reconnect(self, room: Room, token: str) -> Seat:
+        self._ensure_unseated()
+        self._seat = await room.reconnect(token, self.socket)
+        self._room = room
+        return self._seat
 
     async def play_turn(self) -> None:
-        if self._room is None or self._player_id is None:
+        if self._room is None or self._seat is None:
             raise NotSeated()
-        await self._room.play_turn(self._player_id)
+        await self._room.play_turn(self._seat.player_id)
 
     def close(self) -> None:
-        if self._room is not None and self._player_id is not None:
-            self._room.disconnect(self._player_id, self.socket)
+        if self._room is not None and self._seat is not None:
+            self._room.disconnect(self._seat.player_id, self.socket)
 
     def _ensure_unseated(self) -> None:
         if self._room is not None:

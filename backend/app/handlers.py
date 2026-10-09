@@ -2,22 +2,13 @@
 
 from typing import Annotated
 
-from pydantic import BaseModel, ConfigDict, Field
-from pydantic.alias_generators import to_camel
+from pydantic import Field
 
 from app.domain.rules import MAX_SEATS, MIN_SEATS
+from app.room import Seat
 from app.rpc.dispatcher import Method
+from app.rpc.protocol import CamelModel
 from app.session import Session
-
-
-class CamelModel(BaseModel):
-    model_config = ConfigDict(
-        alias_generator=to_camel,
-        populate_by_name=True,
-        extra="forbid",
-        str_strip_whitespace=True,
-    )
-
 
 type PlayerName = Annotated[str, Field(min_length=1, max_length=20)]
 
@@ -41,28 +32,19 @@ class NoParams(CamelModel):
     pass
 
 
-class SeatResult(CamelModel):
-    game_code: str
-    player_id: str
-    token: str
-
-
-async def create_game(params: CreateParams, session: Session) -> SeatResult:
+async def create_game(params: CreateParams, session: Session) -> Seat:
     room = session.lobby.open(params.seats)
-    seat = await session.join(room, params.player_name)
-    return SeatResult(game_code=room.code, player_id=seat.player_id, token=seat.token)
+    return await session.join(room, params.player_name)
 
 
-async def join_game(params: JoinParams, session: Session) -> SeatResult:
+async def join_game(params: JoinParams, session: Session) -> Seat:
     room = session.lobby.find(params.game_code)
-    seat = await session.join(room, params.player_name)
-    return SeatResult(game_code=room.code, player_id=seat.player_id, token=seat.token)
+    return await session.join(room, params.player_name)
 
 
-async def reconnect(params: ReconnectParams, session: Session) -> SeatResult:
+async def reconnect(params: ReconnectParams, session: Session) -> Seat:
     room = session.lobby.find(params.game_code)
-    player_id = await session.reconnect(room, params.token)
-    return SeatResult(game_code=room.code, player_id=player_id, token=params.token)
+    return await session.reconnect(room, params.token)
 
 
 async def roll_dice(_: NoParams, session: Session) -> None:

@@ -1,13 +1,12 @@
 import asyncio
 import secrets
 from contextlib import suppress
-from dataclasses import dataclass
 
 from fastapi import WebSocket, WebSocketDisconnect
 
 from app.domain.errors import GameError
 from app.domain.game import Game
-from app.rpc.protocol import Message, notification_message
+from app.rpc.protocol import CamelModel, Message, notification_message
 from app.views import game_view
 
 STATE_NOTIFICATION = "game.updated"
@@ -18,10 +17,12 @@ class UnknownToken(GameError):
         super().__init__("This seat token is not valid for this game")
 
 
-@dataclass(frozen=True)
-class Seat:
+class Seat(CamelModel):
+    """A player's place in a game. The token lets them take it back after reconnecting."""
+
+    game_code: str
     player_id: str
-    token: str  # secret that lets the player take the seat back after reconnecting
+    token: str
 
 
 class Room:
@@ -30,7 +31,7 @@ class Room:
     def __init__(self, code: str, game: Game) -> None:
         self.code = code
         self._game = game
-        self._tokens: dict[str, str] = {}  # token -> player id
+        self._seats: dict[str, Seat] = {}  # by token
         self._sockets: dict[str, WebSocket] = {}  # player id -> live socket
         # Held across "change + broadcast" so that concurrent turns cannot interleave their
         # broadcasts and deliver states out of order.
@@ -39,20 +40,20 @@ class Room:
     async def join(self, name: str, socket: WebSocket) -> Seat:
         async with self._lock:
             player = self._game.add_player(name)
-            seat = Seat(player.id, secrets.token_urlsafe(16))
-            self._tokens[seat.token] = player.id
+            seat = Seat(game_code=self.code, player_id=player.id, token=secrets.token_urlsafe(16))
+            self._seats[seat.token] = seat
             self._sockets[player.id] = socket
             await self._broadcast()
         return seat
 
-    async def reconnect(self, token: str, socket: WebSocket) -> str:
-        player_id = self._tokens.get(token)
-        if player_id is None:
+    async def reconnect(self, token: str, socket: WebSocket) -> Seat:
+        seat = self._seats.get(token)
+        if seat is None:
             raise UnknownToken()
         async with self._lock:
-            self._sockets[player_id] = socket
+            self._sockets[seat.player_id] = socket
             await socket.send_json(self._state_message())
-        return player_id
+        return seat
 
     async def play_turn(self, player_id: str) -> None:
         async with self._lock:

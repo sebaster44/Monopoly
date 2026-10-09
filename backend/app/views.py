@@ -12,6 +12,7 @@ from app.rpc.protocol import Message
 
 
 def game_view(code: str, game: Game) -> Message:
+    current = game.current_player
     return {
         "code": code,
         "status": game.status.value,
@@ -21,7 +22,7 @@ def game_view(code: str, game: Game) -> Message:
             for position, square in enumerate(game.rules.board)
         ],
         "players": [_player_view(player) for player in game.players],
-        "currentPlayerId": game.current_player_id,
+        "currentPlayerId": None if current is None else current.id,
         "winnerId": game.winner_id,
         "log": [_event_view(event) for event in game.log],
     }

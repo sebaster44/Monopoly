@@ -3,6 +3,7 @@
 from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field
+from pydantic.alias_generators import to_camel
 
 PARSE_ERROR = -32700
 INVALID_REQUEST = -32600
@@ -36,6 +37,17 @@ class Request(BaseModel):
     @property
     def is_notification(self) -> bool:
         return "id" not in self.model_fields_set
+
+
+class CamelModel(BaseModel):
+    """Base for params and results: snake_case in Python, camelCase on the wire."""
+
+    model_config = ConfigDict(
+        alias_generator=to_camel,
+        populate_by_name=True,
+        extra="forbid",
+        str_strip_whitespace=True,
+    )
 
 
 def result_message(request_id: RequestId, result: Any) -> Message:

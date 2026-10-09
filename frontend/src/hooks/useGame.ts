@@ -22,12 +22,10 @@ function socketUrl(): string {
 
 export function useGame() {
   const [api, setApi] = useState<GameApi | null>(null);
-  const [connection, setConnection] = useState(0);
   const [game, setGame] = useState<GameState | null>(null);
   const [seat, setSeat] = useState<Seat | null>(null);
   const [error, setError] = useState<string | null>(null);
 
-  // A new connection per "session": the server binds a socket to at most one seat.
   useEffect(() => {
     const next = new GameApi(socketUrl(), () =>
       setError("Connection to the game server lost. Reload the page to reconnect."),
@@ -43,7 +41,7 @@ export function useGame() {
         .catch(() => saveSeat(null));
     }
     return () => next.close();
-  }, [connection]);
+  }, []);
 
   async function attempt(action: () => Promise<void>): Promise<void> {
     setError(null);
@@ -71,12 +69,10 @@ export function useGame() {
     join: (gameCode: string, playerName: string) =>
       takeSeat((api) => api.join(gameCode, playerName)),
     rollDice: () => attempt(async () => api?.rollDice()),
+    // The server binds a connection to one seat, so leaving means starting over on a new one.
     leave: () => {
       saveSeat(null);
-      setSeat(null);
-      setGame(null);
-      setError(null);
-      setConnection((count) => count + 1);
+      location.reload();
     },
   };
 }

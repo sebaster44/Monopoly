@@ -33,10 +33,14 @@ class Game:
         self.status = GameStatus.WAITING
         self.players: list[Player] = []
         self.owners: dict[int, str] = {}  # board position -> owner's player id
-        self.current_player_id: str | None = None
         self.winner_id: str | None = None
         self.log: list[Event] = []
+        self._turn = 0  # index into players
         self._roll_die = roll_die
+
+    @property
+    def current_player(self) -> Player | None:
+        return self.players[self._turn] if self.status is GameStatus.PLAYING else None
 
     def add_player(self, name: str) -> Player:
         if self.status is not GameStatus.WAITING:
@@ -49,11 +53,11 @@ class Game:
         return player
 
     def play_turn(self, player_id: str) -> None:
-        if self.status is not GameStatus.PLAYING:
+        player = self.current_player
+        if player is None:
             raise GameNotInProgress()
-        if player_id != self.current_player_id:
+        if player.id != player_id:
             raise NotYourTurn()
-        player = self._player(player_id)
         self._move(player, self._roll_die())
         self._resolve_square(player)
         if self.status is GameStatus.PLAYING:
@@ -61,12 +65,10 @@ class Game:
 
     def _start(self) -> None:
         self.status = GameStatus.PLAYING
-        self.current_player_id = self.players[0].id
         self.log.append(GameStarted())
 
     def _move(self, player: Player, roll: int) -> None:
-        board_size = len(self.rules.board)
-        laps, player.position = divmod(player.position + roll, board_size)
+        laps, player.position = divmod(player.position + roll, len(self.rules.board))
         self.log.append(Moved(player.id, roll, player.position))
         if laps:
             player.money += self.rules.start_salary
@@ -111,14 +113,13 @@ class Game:
 
     def _finish(self, winner: Player) -> None:
         self.status = GameStatus.FINISHED
-        self.current_player_id = None
         self.winner_id = winner.id
         self.log.append(GameWon(winner.id))
 
     def _pass_turn(self) -> None:
-        current = next(i for i, p in enumerate(self.players) if p.id == self.current_player_id)
-        following = self.players[current + 1 :] + self.players[: current + 1]
-        self.current_player_id = next(p.id for p in following if not p.is_bankrupt)
+        self._turn = (self._turn + 1) % len(self.players)
+        while self.players[self._turn].is_bankrupt:
+            self._turn = (self._turn + 1) % len(self.players)
 
     def _player(self, player_id: str) -> Player:
         return next(p for p in self.players if p.id == player_id)
