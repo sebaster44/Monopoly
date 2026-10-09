@@ -1,15 +1,21 @@
+import { useEffect, useRef } from "react";
 import type { GameState } from "../api/types";
 import { describe } from "../game/describe";
 
 export function EventLog({ game }: { game: GameState }) {
-  const newestFirst = game.log.map((event) => describe(event, game)).reverse();
+  const list = useRef<HTMLOListElement>(null);
+
+  // Oldest first, like a chat: keep the latest event in view as new ones arrive.
+  useEffect(() => {
+    list.current?.scrollTo({ top: list.current.scrollHeight });
+  }, [game.log.length]);
 
   return (
     <section className="card">
       <h2>Activity</h2>
-      <ol className="event-log">
-        {newestFirst.map((line, index) => (
-          <li key={game.log.length - index}>{line}</li>
+      <ol ref={list} className="event-log">
+        {game.log.map((event, index) => (
+          <li key={index}>{describe(event, game)}</li>
         ))}
       </ol>
     </section>
