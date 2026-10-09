@@ -1,10 +1,13 @@
 """Start the backend and the frontend dev server together. Ctrl+C stops both.
 
-Usage: python start.py   (set BACKEND_PORT to use another port than 8000)
+Usage: python start.py
+The backend takes port 8000, or the next free port if 8000 is busy. The frontend is always
+served at http://localhost:5173.
 """
 
 import os
 import shutil
+import socket
 import subprocess
 import sys
 import time
@@ -15,7 +18,7 @@ ROOT = Path(__file__).resolve().parent
 BACKEND = ROOT / "backend"
 FRONTEND = ROOT / "frontend"
 VENV = BACKEND / ".venv"
-BACKEND_PORT = os.environ.get("BACKEND_PORT", "8000")
+FRONTEND_PORT = 5173
 
 
 def venv_python() -> Path:
@@ -37,16 +40,27 @@ def install_frontend() -> None:
     subprocess.run([shutil.which("npm") or "npm", "install"], cwd=FRONTEND, check=True)
 
 
-def start_servers() -> list[subprocess.Popen[bytes]]:
+def is_free(port: int) -> bool:
+    with socket.socket() as probe:
+        return probe.connect_ex(("127.0.0.1", port)) != 0
+
+
+def free_backend_port() -> int:
+    if not is_free(FRONTEND_PORT):
+        sys.exit(f"The frontend needs port {FRONTEND_PORT}, but something else is using it.")
+    return next(port for port in range(8000, 8100) if is_free(port))
+
+
+def start_servers(backend_port: int) -> list[subprocess.Popen[bytes]]:
     backend = subprocess.Popen(
-        [venv_python(), "-m", "uvicorn", "app.main:app", "--port", BACKEND_PORT], cwd=BACKEND
+        [venv_python(), "-m", "uvicorn", "app.main:app", "--port", str(backend_port)], cwd=BACKEND
     )
     # Vite is run through node directly rather than `npm run dev`: on Windows npm adds a cmd.exe
     # wrapper, and terminating the wrapper would leave Vite running.
     frontend = subprocess.Popen(
-        ["node", FRONTEND / "node_modules/vite/bin/vite.js"],
+        ["node", FRONTEND / "node_modules/vite/bin/vite.js", "--strictPort"],
         cwd=FRONTEND,
-        env={**os.environ, "BACKEND_PORT": BACKEND_PORT},
+        env={**os.environ, "BACKEND_PORT": str(backend_port)},
     )
     return [backend, frontend]
 
@@ -57,7 +71,9 @@ def main() -> None:
     install_backend()
     install_frontend()
 
-    servers = start_servers()
+    backend_port = free_backend_port()
+    print(f"\nBackend on port {backend_port}. Open http://localhost:{FRONTEND_PORT} to play.\n")
+    servers = start_servers(backend_port)
     try:
         while all(server.poll() is None for server in servers):
             time.sleep(0.5)

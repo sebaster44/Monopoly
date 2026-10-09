@@ -16,7 +16,7 @@ python start.py
 ```
 
 It installs the dependencies on first run, starts both servers, and stops both on Ctrl+C. Then open
-http://localhost:5173. Set `BACKEND_PORT` if port 8000 is taken.
+http://localhost:5173. The backend uses port 8000, or the next free port if 8000 is taken.
 
 Or start each part manually:
 
